@@ -25,6 +25,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxfixes3 \
     libxkbcommon0 \
     libxrandr2 \
+    libxshmfence1 \
+    libxss1 \
+    libxtst6 \
     xvfb \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*

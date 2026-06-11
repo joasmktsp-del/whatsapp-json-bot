@@ -25,6 +25,8 @@ const whatsapp = new GerenciadorWhatsApp();
 
 const multer = require('multer');
 const IMAGEM_DIR = path.join(__dirname, '..', 'storage', 'imagem_envio');
+// Cria diretório se não existir (importante em Railway/sem Volume)
+try { fs.mkdirSync(IMAGEM_DIR, { recursive: true }); } catch (e) { /* silent */ }
 const imagemStorage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, IMAGEM_DIR),
   filename: (req, file, cb) => cb(null, 'imagem_envio' + path.extname(file.originalname))
@@ -52,10 +54,17 @@ app.get('/api/imagem-file', (req, res) => {
 });
 
 // Upload imagem
-app.post('/api/upload-imagem', uploadImagem.single('imagem'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado' });
-  imagemEnvioPath = req.file.path;
-  res.json({ sucesso: true, nome: req.file.originalname });
+app.post('/api/upload-imagem', (req, res) => {
+  uploadImagem.single('imagem')(req, res, (err) => {
+    if (err) {
+      console.error('🔴 Erro upload imagem:', err.message);
+      return res.status(500).json({ error: 'Erro no upload: ' + err.message });
+    }
+    if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+    imagemEnvioPath = req.file.path;
+    console.log('  🟢 Imagem salva:', req.file.path, '(', req.file.size, 'bytes)');
+    res.json({ sucesso: true, nome: req.file.originalname, tamanho: req.file.size });
+  });
 });
 
 // Status da imagem

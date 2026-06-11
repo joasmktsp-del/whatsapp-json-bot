@@ -162,6 +162,12 @@
               <option value="nota">Nota (maior)</option>
             </select>
           </div>
+          <div class="filtro-grupo">
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; padding-top:18px;">
+              <input type="checkbox" id="filtroSoComWhatsapp" checked onchange="apenasComTelefone = this.checked; filtrarClientes()">
+              <span>📱 Só com WhatsApp</span>
+            </label>
+          </div>
           <div class="filtro-acoes">
             <button class="btn btn-primary btn-sm" onclick="selecionarTodos()">Selecionar visíveis</button>
             <button class="btn btn-success btn-sm" onclick="aprovarSelecionados()">✅ Aprovar selecionados</button>

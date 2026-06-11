@@ -4,6 +4,7 @@ let clientesFiltrados = [];
 let selecionados = new Set();
 let socket = null;
 let pagina = 1;
+let apenasComTelefone = true; // FILTRO: só mostra clientes com WhatsApp
 const TAM_PAGINA = 20;
 
 /* ========== INIT ========== */
@@ -120,6 +121,7 @@ function filtrarClientes() {
   const ordem = document.getElementById('filtroOrdenar').value;
 
   clientesFiltrados = clientes.filter(c => {
+    if (apenasComTelefone && (!c.telefone || c.telefone.trim() === '')) return false;
     if (status !== 'todos' && c.status !== status) return false;
     if (busca) {
       const text = `${c.nome} ${c.bairro} ${c.telefone || ''} ${c.tipo}`.toLowerCase();

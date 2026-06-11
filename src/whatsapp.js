@@ -5,11 +5,12 @@ const EventEmitter = require('events');
 const fs = require('fs');
 const path = require('path');
 
-// Detecta Chrome/Chromium no Windows ou Linux (Railway)
+// Detecta Chrome/Chromium no Windows ou Linux (Railway, Nix, Docker)
 function detectarChrome() {
+  // Caminhos estáticos conhecidos
   const candidatos = [
-    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
-    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\Program Files\Google\Chrome\Application\chrome.exe',
+    'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe',
     '/usr/bin/chromium',
     '/usr/bin/chromium-browser',
     '/usr/bin/google-chrome',
@@ -17,7 +18,24 @@ function detectarChrome() {
     '/snap/bin/chromium',
     process.env.PUPPETEER_EXECUTABLE_PATH
   ].filter(Boolean);
-  return candidatos.find(p => fs.existsSync(p)) || null;
+
+  for (const p of candidatos) {
+    if (fs.existsSync(p)) return p;
+  }
+
+  // Railway/Nix: procura via shell (chromium no Nix store)
+  try {
+    const { execSync } = require('child_process');
+    const found = execSync('which chromium chromium-browser google-chrome google-chrome-stable 2>/dev/null || true', { encoding: 'utf8', timeout: 3000 }).trim();
+    if (found && found.includes('/')) {
+      const first = found.split('\n')[0].trim();
+      if (first) return first;
+    }
+  } catch (e) {
+    // ignora erro do which
+  }
+
+  return null;
 }
 
 class GerenciadorWhatsApp extends EventEmitter {

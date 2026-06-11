@@ -1,0 +1,7 @@
+node_modules
+storage/clientes.json
+storage/log_envio.json
+storage/fila_ids.json
+storage/imagem_envio/
+storage/whatsapp-session/
+.env

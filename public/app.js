@@ -190,6 +190,7 @@ function renderizarClientes() {
           <button class="btn btn-primary btn-sm" onclick="enviarAgora('${c.id}')">📤 Enviar agora</button>
           <button class="btn btn-secondary btn-sm" onclick="marcarEnviado('${c.id}')">📤 Marc. enviado</button>
           <button class="btn btn-danger btn-sm" onclick="ignorarCliente('${c.id}')">🚫 Ignorar</button>
+          <button class="btn btn-dark btn-sm" onclick="excluirCliente('${c.id}', '${(c.nome || '').replace(/'/g, '')}')">🗑️ Excluir</button>
         </div>
       </div>
     `;
@@ -235,6 +236,18 @@ async function ignorarCliente(id) {
     const idx = clientes.findIndex(c => c.id === id);
     if (idx !== -1) clientes[idx] = atualizado;
     filtrarClientes();
+  } catch (err) {
+    notificar(`❌ ${err.message}`, 'erro');
+  }
+}
+
+async function excluirCliente(id, nome) {
+  if (!confirm(`🗑️ Excluir "${nome || id}" PERMANENTEMENTE?\n\nEssa ação não pode ser desfeita. O cliente será removido do arquivo JSON.`)) return;
+  try {
+    await api(`/api/clientes/${id}`, { method: 'DELETE' });
+    clientes = clientes.filter(c => c.id !== id);
+    filtrarClientes();
+    notificar(`🗑️ Cliente "${nome || id}" excluído`, 'sucesso');
   } catch (err) {
     notificar(`❌ ${err.message}`, 'erro');
   }

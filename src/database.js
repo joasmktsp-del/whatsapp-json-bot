@@ -55,6 +55,15 @@ function atualizarCliente(id, dados) {
   return clientes[idx];
 }
 
+function excluirCliente(id) {
+  const clientes = carregarClientes();
+  const idx = clientes.findIndex(c => c.id === id);
+  if (idx === -1) return null;
+  const removido = clientes.splice(idx, 1)[0];
+  salvarClientes(clientes);
+  return removido;
+}
+
 function contarPorStatus() {
   const clientes = carregarClientes();
   const contagem = {};
@@ -128,6 +137,7 @@ module.exports = {
   salvarConfig,
   buscarCliente,
   atualizarCliente,
+  excluirCliente,
   contarPorStatus,
   clientesPorStatus,
   clientesEnviaveis,

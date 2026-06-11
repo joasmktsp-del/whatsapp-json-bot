@@ -124,6 +124,18 @@ app.post('/api/clientes/:id/ignorar', (req, res) => {
   res.json(atualizado);
 });
 
+// Excluir cliente permanentemente (remove do JSON)
+app.delete('/api/clientes/:id', (req, res) => {
+  const id = req.params.id;
+  const removido = db.excluirCliente(id);
+  if (!removido) return res.status(404).json({ error: 'Cliente não encontrado' });
+  // Remove também da fila se estiver
+  try { queue.removerDaFila(id); } catch (e) { /* silent */ }
+  io.emit('cliente_removido', { id });
+  io.emit('contagem', db.contarPorStatus());
+  res.json({ ok: true, removido });
+});
+
 // Editar mensagem de um cliente
 app.post('/api/clientes/:id/editar-mensagem', (req, res) => {
   const { mensagem } = req.body;

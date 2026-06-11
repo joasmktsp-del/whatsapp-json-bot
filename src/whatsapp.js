@@ -12,7 +12,7 @@ function detectarChrome() {
     return process.env.PUPPETEER_EXECUTABLE_PATH;
   }
 
-  // 2. Caminhos estáticos conhecidos (Windows + Linux)
+  // 2. Caminhos estáticos conhecidos (Windows + Linux/Docker)
   const candidatos = [
     'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
     'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',

@@ -169,6 +169,10 @@
             </label>
           </div>
           <div class="filtro-acoes">
+            <label class="btn btn-info btn-sm" style="cursor:pointer;">
+              📂 Importar JSON
+              <input type="file" id="inputImportar" accept=".json" style="display:none" onchange="importarArquivo(this)">
+            </label>
             <button class="btn btn-primary btn-sm" onclick="selecionarTodos()">Selecionar visíveis</button>
             <button class="btn btn-success btn-sm" onclick="aprovarSelecionados()">✅ Aprovar selecionados</button>
           </div>

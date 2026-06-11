@@ -255,6 +255,28 @@ async function excluirCliente(id, nome) {
   }
 }
 
+async function importarArquivo(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (!confirm(`📂 Importar "${file.name}"?\n\nOs clientes serão adicionados ao JSON atual (sem duplicar telefones já existentes).`)) {
+    input.value = '';
+    return;
+  }
+  const fd = new FormData();
+  fd.append('arquivo', file);
+  notificar('📥 Importando...', 'info');
+  try {
+    const r = await fetch('/api/importar', { method: 'POST', body: fd });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error || 'Erro');
+    notificar(`✅ Importados: ${j.adicionados} | Já existiam: ${j.ignorados_ja_existiam} | Sem tel: ${j.sem_telefone}`, 'sucesso');
+    await carregarClientes();
+  } catch (err) {
+    notificar(`❌ ${err.message}`, 'erro');
+  }
+  input.value = '';
+}
+
 async function enviarAgora(id) {
   const btn = event.target;
   btn.disabled = true;

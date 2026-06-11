@@ -86,6 +86,36 @@ app.get('/api/status', (req, res) => {
   });
 });
 
+// Importar JSON via upload (sem depender de arquivo fixo)
+const uploadJson = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/json' || file.originalname.endsWith('.json')) cb(null, true);
+    else cb(new Error('Apenas arquivos .json são permitidos'));
+  }
+});
+app.post('/api/importar', uploadJson.single('arquivo'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado' });
+  let dados;
+  try {
+    dados = JSON.parse(req.file.buffer.toString('utf-8'));
+  } catch (e) {
+    return res.status(400).json({ error: 'JSON inválido: ' + e.message });
+  }
+  if (!Array.isArray(dados)) {
+    return res.status(400).json({ error: 'JSON deve ser um array de clientes' });
+  }
+  try {
+    const resultado = importer.importarDeObjeto(dados);
+    io.emit('contagem', db.contarPorStatus());
+    io.emit('notificacao', { tipo: 'sucesso', texto: `📥 Importados: ${resultado.adicionados} | Já existiam: ${resultado.ignorados_ja_existiam} | Sem tel: ${resultado.sem_telefone}` });
+    res.json(resultado);
+  } catch (e) {
+    res.status(500).json({ error: 'Erro ao importar: ' + e.message });
+  }
+});
+
 // Listar clientes
 app.get('/api/clientes', (req, res) => {
   const { status } = req.query;

@@ -1,4 +1,4 @@
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode');
 const EventEmitter = require('events');
 
@@ -82,7 +82,7 @@ class GerenciadorWhatsApp extends EventEmitter {
 
     this.client = new Client({
       authStrategy: new LocalAuth({
-        dataPath: require('path').join(__dirname, '..', 'storage', 'whatsapp-session')
+        dataPath: path.join(__dirname, '..', 'storage', 'whatsapp-session')
       }),
       puppeteer: puppeteerOpts
     });
@@ -93,8 +93,8 @@ class GerenciadorWhatsApp extends EventEmitter {
       try {
         this.qrCodeBase64 = await qrcode.toDataURL(qr);
         console.log('  🟢 QR Code convertido para base64');
-      } catch {
-        console.error('  🔴 Falha ao converter QR para base64');
+      } catch (err) {
+        console.error('  🔴 Erro QR:', err.message);
         this.qrCodeBase64 = null;
       }
       this.emit('qr', { qr, qrBase64: this.qrCodeBase64 });
@@ -137,6 +137,8 @@ class GerenciadorWhatsApp extends EventEmitter {
       console.log('  🟢 WhatsApp client initialized successfully');
     } catch (err) {
       this.inicializando = false;
+      this.qrCodeData = null;
+      this.qrCodeBase64 = null;
       console.error('  🔴 Erro ao inicializar WhatsApp:', err.message);
       if (err.stack) console.error('     Stack:', err.stack.split('\n').slice(0, 3).join('\n     '));
       this.emit('erro', { erro: err.message });
@@ -161,8 +163,6 @@ class GerenciadorWhatsApp extends EventEmitter {
     if (!this.conectado || !this.client) {
       throw new Error('WhatsApp não conectado');
     }
-    const { MessageMedia } = require('whatsapp-web.js');
-    const fs = require('fs');
     if (!fs.existsSync(caminhoImagem)) throw new Error('Arquivo de imagem não encontrado');
     const media = MessageMedia.fromFilePath(caminhoImagem);
     const chatId = numero.includes('@c.us') ? numero : `${numero}@c.us`;
@@ -175,9 +175,7 @@ class GerenciadorWhatsApp extends EventEmitter {
    */
   async desconectar() {
     if (this.client) {
-      await this.client.destroy();
-      this.client = null;
-      this.conectado = false;
+      try { await this.client.destroy(); } finally { this.client = null; this.conectado = false; }
     }
   }
 

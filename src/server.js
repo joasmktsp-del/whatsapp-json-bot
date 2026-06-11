@@ -7,6 +7,7 @@ const { Server } = require('socket.io');
 const importer = require('./importer');
 const db = require('./database');
 const queue = require('./queue');
+const messageService = require('./services/messageService');
 const GerenciadorWhatsApp = require('./whatsapp');
 
 process.on('unhandledRejection', (err) => {
@@ -20,6 +21,14 @@ process.on('uncaughtException', (err) => {
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
+
+// ========== AUTH MIDDLEWARE ==========
+const ADMIN_TOKEN = process.env.ADMIN_TOKEN || 'geltech2026';
+const requireAuth = (req, res, next) => {
+  const token = req.headers['x-admin-token'] || req.query.token;
+  if (token === ADMIN_TOKEN) return next();
+  return res.status(401).json({ error: 'Não autorizado' });
+};
 
 const whatsapp = new GerenciadorWhatsApp();
 
@@ -54,7 +63,8 @@ app.get('/api/imagem-file', (req, res) => {
 });
 
 // Upload imagem
-app.post('/api/upload-imagem', (req, res) => {
+app.post('/api/upload-imagem', requireAuth, (req, res) => {
+  try {
   uploadImagem.single('imagem')(req, res, (err) => {
     if (err) {
       console.error('🔴 Erro upload imagem:', err.message);
@@ -65,6 +75,10 @@ app.post('/api/upload-imagem', (req, res) => {
     console.log('  🟢 Imagem salva:', req.file.path, '(', req.file.size, 'bytes)');
     res.json({ sucesso: true, nome: req.file.originalname, tamanho: req.file.size });
   });
+  } catch (err) {
+    console.error('🔴 Erro:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Status da imagem
@@ -76,12 +90,17 @@ app.get('/api/imagem', (req, res) => {
 });
 
 // Remover imagem
-app.delete('/api/imagem', (req, res) => {
+app.delete('/api/imagem', requireAuth, (req, res) => {
+  try {
   if (imagemEnvioPath && fs.existsSync(imagemEnvioPath)) {
     fs.unlinkSync(imagemEnvioPath);
   }
   imagemEnvioPath = null;
   res.json({ sucesso: true });
+  } catch (err) {
+    console.error('🔴 Erro:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // ========== API REST ==========
@@ -104,7 +123,8 @@ const uploadJson = multer({
     else cb(new Error('Apenas arquivos .json são permitidos'));
   }
 });
-app.post('/api/importar', uploadJson.single('arquivo'), (req, res) => {
+app.post('/api/importar', requireAuth, uploadJson.single('arquivo'), (req, res) => {
+  try {
   if (!req.file) return res.status(400).json({ error: 'Nenhum arquivo enviado' });
   let dados;
   try {
@@ -123,6 +143,10 @@ app.post('/api/importar', uploadJson.single('arquivo'), (req, res) => {
   } catch (e) {
     res.status(500).json({ error: 'Erro ao importar: ' + e.message });
   }
+  } catch (err) {
+    console.error('🔴 Erro:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Listar clientes
@@ -140,7 +164,8 @@ app.get('/api/clientes/:id', (req, res) => {
 });
 
 // Aprovar cliente (vai pra fila mas mantém status aprovado p/ contador verde)
-app.post('/api/clientes/:id/aprovar', (req, res) => {
+app.post('/api/clientes/:id/aprovar', requireAuth, (req, res) => {
+  try {
   const atualizado = db.atualizarCliente(req.params.id, {
     status: 'aprovado',
     enfileirado_em: new Date().toISOString()
@@ -152,19 +177,29 @@ app.post('/api/clientes/:id/aprovar', (req, res) => {
   io.emit('contagem', db.contarPorStatus());
   io.emit('fila_atualizada', { na_fila: queue.getStatusFila().tamanho });
   res.json(atualizado);
+  } catch (err) {
+    console.error('🔴 Erro:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Ignorar cliente (arquivar)
-app.post('/api/clientes/:id/ignorar', (req, res) => {
+app.post('/api/clientes/:id/ignorar', requireAuth, (req, res) => {
+  try {
   const atualizado = db.atualizarCliente(req.params.id, { status: 'erro' });
   if (!atualizado) return res.status(404).json({ error: 'Cliente não encontrado' });
   io.emit('cliente_atualizado', atualizado);
   io.emit('contagem', db.contarPorStatus());
   res.json(atualizado);
+  } catch (err) {
+    console.error('🔴 Erro:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Excluir cliente permanentemente (remove do JSON)
-app.delete('/api/clientes/:id', (req, res) => {
+app.delete('/api/clientes/:id', requireAuth, (req, res) => {
+  try {
   const id = req.params.id;
   const removido = db.excluirCliente(id);
   if (!removido) return res.status(404).json({ error: 'Cliente não encontrado' });
@@ -173,10 +208,15 @@ app.delete('/api/clientes/:id', (req, res) => {
   io.emit('cliente_removido', { id });
   io.emit('contagem', db.contarPorStatus());
   res.json({ ok: true, removido });
+  } catch (err) {
+    console.error('🔴 Erro:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Editar mensagem de um cliente
-app.post('/api/clientes/:id/editar-mensagem', (req, res) => {
+app.post('/api/clientes/:id/editar-mensagem', requireAuth, (req, res) => {
+  try {
   const { mensagem } = req.body;
   if (!mensagem || !mensagem.trim()) {
     return res.status(400).json({ error: 'Mensagem não pode ficar vazia' });
@@ -186,10 +226,15 @@ app.post('/api/clientes/:id/editar-mensagem', (req, res) => {
   io.emit('cliente_atualizado', atualizado);
   io.emit('contagem', db.contarPorStatus());
   res.json({ sucesso: true, cliente: atualizado });
+  } catch (err) {
+    console.error('🔴 Erro:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Marcar como enviado manualmente (sem WhatsApp)
-app.post('/api/clientes/:id/marcar-enviado', (req, res) => {
+app.post('/api/clientes/:id/marcar-enviado', requireAuth, (req, res) => {
+  try {
   const cliente = db.buscarCliente(req.params.id);
   if (!cliente) return res.status(404).json({ error: 'Cliente não encontrado' });
   const atualizado = db.atualizarCliente(req.params.id, {
@@ -212,96 +257,46 @@ app.post('/api/clientes/:id/marcar-enviado', (req, res) => {
   io.emit('cliente_atualizado', atualizado);
   io.emit('contagem', db.contarPorStatus());
   res.json({ sucesso: true, cliente: atualizado });
+  } catch (err) {
+    console.error('🔴 Erro:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
-// Enviar agora (um cliente específico)
-app.post('/api/clientes/:id/enviar-agora', async (req, res) => {
+// Enviar agora (um cliente específico) — delega a lógica unificada ao messageService
+app.post('/api/clientes/:id/enviar-agora', requireAuth, async (req, res) => {
   const cliente = db.buscarCliente(req.params.id);
   if (!cliente) return res.status(404).json({ error: 'Cliente não encontrado' });
-  if (!whatsapp.getStatus().conectado) {
-    return res.status(400).json({ error: 'WhatsApp não conectado' });
-  }
-  if (!cliente.telefone) {
-    return res.status(400).json({ error: 'Cliente sem telefone' });
-  }
 
   try {
-    io.emit('log_terminal', {
-      hora: new Date().toLocaleTimeString(),
-      texto: `📤 Enviando agora para ${cliente.nome} (${cliente.telefone})...`,
-      tipo: 'info'
-    });
-    const resultado = await whatsapp.enviarMensagem(cliente.telefone, cliente.mensagem);
-    io.emit('log_terminal', {
-      hora: new Date().toLocaleTimeString(),
-      texto: `✅ Texto enviado para ${cliente.nome}`,
-      tipo: 'sucesso'
+    const resultado = await messageService.enviarParaCliente(cliente, {
+      io,
+      whatsapp,
+      db,
+      queue,
+      imagemPath: imagemEnvioPath,
+      socketEmit: true,
+      metodo: 'enviar_agora'
     });
 
-    // Envia imagem se houver
-    let detalhes = 'OK';
-    if (imagemEnvioPath && fs.existsSync(imagemEnvioPath)) {
-      io.emit('log_terminal', {
-        hora: new Date().toLocaleTimeString(),
-        texto: `🖼️ Enviando imagem para ${cliente.nome}...`,
-        tipo: 'info'
-      });
-      try {
-        await whatsapp.enviarImagem(cliente.telefone, imagemEnvioPath);
-        io.emit('log_terminal', {
-          hora: new Date().toLocaleTimeString(),
-          texto: `✅ Imagem enviada para ${cliente.nome}`,
-          tipo: 'sucesso'
-        });
-        detalhes = 'texto+imagem';
-      } catch (imgErr) {
-        io.emit('log_terminal', {
-          hora: new Date().toLocaleTimeString(),
-          texto: `⚠️ Falha ao enviar imagem para ${cliente.nome}: ${imgErr.message}`,
-          tipo: 'aviso'
-        });
-        detalhes = `texto, img_erro: ${imgErr.message}`;
-      }
+    if (!resultado.sucesso) {
+      const statusCode = resultado.erro === 'WhatsApp não conectado' ? 400 : 500;
+      return res.status(statusCode).json({ error: resultado.erro || 'Falha no envio' });
     }
 
-    const atualizado = db.atualizarCliente(cliente.id, {
-      status: 'enviado',
-      enviado_em: new Date().toISOString()
+    res.json({
+      sucesso: true,
+      cliente: db.buscarCliente(cliente.id),
+      imageEnviada: resultado.imageEnviada
     });
-    // Log
-    db.adicionarLogEnvio({
-      cliente_id: cliente.id,
-      nome: cliente.nome,
-      telefone: cliente.telefone,
-      bairro: cliente.bairro,
-      status: 'enviado',
-      metodo: 'enviar_agora',
-      detalhes
-    });
-    io.emit('cliente_atualizado', atualizado);
-    io.emit('contagem', db.contarPorStatus());
-    res.json({ sucesso: true, cliente: atualizado, resultado });
   } catch (err) {
-    io.emit('log_terminal', {
-      hora: new Date().toLocaleTimeString(),
-      texto: `❌ Erro ao enviar para ${cliente.nome}: ${err.message}`,
-      tipo: 'erro'
-    });
-    db.adicionarLogEnvio({
-      cliente_id: cliente.id,
-      nome: cliente.nome,
-      telefone: cliente.telefone,
-      bairro: cliente.bairro,
-      status: 'erro',
-      metodo: 'enviar_agora',
-      detalhes: err.message
-    });
     res.status(500).json({ error: err.message });
   }
 });
 
 // Iniciar fila de envio
-app.post('/api/fila/iniciar', (req, res) => {
+app.post('/api/fila/iniciar', requireAuth, (req, res) => {
+  try {
   const { ids } = req.body;
   if (!ids || !Array.isArray(ids) || ids.length === 0) {
     return res.status(400).json({ error: 'Lista de IDs obrigatória' });
@@ -392,16 +387,26 @@ app.post('/api/fila/iniciar', (req, res) => {
 
   queue.iniciar();
   res.json({ sucesso: true, adicionados, fila: queue.getStatusFila() });
+  } catch (err) {
+    console.error('🔴 Erro:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Pausar fila
-app.post('/api/fila/pausar', (req, res) => {
+app.post('/api/fila/pausar', requireAuth, (req, res) => {
+  try {
   queue.pausar();
   res.json({ sucesso: true });
+  } catch (err) {
+    console.error('🔴 Erro:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Disparar fila (iniciar processamento)
-app.post('/api/fila/disparar', (req, res) => {
+app.post('/api/fila/disparar', requireAuth, (req, res) => {
+  try {
   if (!whatsapp.getStatus().conectado) {
     return res.status(400).json({ error: 'WhatsApp não conectado' });
   }
@@ -411,13 +416,22 @@ app.post('/api/fila/disparar', (req, res) => {
   } else {
     res.status(400).json({ error: result.motivo === 'fila_vazia' ? 'Fila vazia' : 'Fila já está rodando' });
   }
+  } catch (err) {
+    console.error('🔴 Erro:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Limpar fila (volta tudo para aprovado)
-app.post('/api/fila/limpar', (req, res) => {
+app.post('/api/fila/limpar', requireAuth, (req, res) => {
+  try {
   queue.limpar();
   io.emit('contagem', db.contarPorStatus());
   res.json({ sucesso: true });
+  } catch (err) {
+    console.error('🔴 Erro:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Status da fila
@@ -431,11 +445,16 @@ app.get('/api/fila/detalhada', (req, res) => {
 });
 
 // Remover da fila
-app.post('/api/fila/remover/:id', (req, res) => {
+app.post('/api/fila/remover/:id', requireAuth, (req, res) => {
+  try {
   queue.removerDaFila(req.params.id);
   io.emit('cliente_atualizado', db.buscarCliente(req.params.id));
   io.emit('contagem', db.contarPorStatus());
   res.json({ sucesso: true });
+  } catch (err) {
+    console.error('🔴 Erro:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // QR Code
@@ -454,11 +473,16 @@ app.get('/api/config', (req, res) => {
   res.json(db.carregarConfig());
 });
 
-app.post('/api/config', (req, res) => {
+app.post('/api/config', requireAuth, (req, res) => {
+  try {
   const config = db.carregarConfig();
   const novos = { ...config, ...req.body };
   db.salvarConfig(novos);
   res.json(novos);
+  } catch (err) {
+    console.error('🔴 Erro:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Log de envios
@@ -466,20 +490,18 @@ app.get('/api/log-envios', (req, res) => {
   res.json(db.carregarLogEnvios());
 });
 
-app.post('/api/log-envios/limpar', (req, res) => {
+app.post('/api/log-envios/limpar', requireAuth, (req, res) => {
+  try {
   db.limparLogEnvios();
   res.json({ sucesso: true });
-});
-
-// Importar/reimportar dados
-app.post('/api/importar', (req, res) => {
-  const result = importer.importar();
-  io.emit('contagem', db.contarPorStatus());
-  res.json(result);
+  } catch (err) {
+    console.error('🔴 Erro:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Importar JSON enviado pelo usuário (upload via UI)
-app.post('/api/importar/upload', (req, res) => {
+app.post('/api/importar/upload', requireAuth, (req, res) => {
   try {
     const { clientes } = req.body;
     if (!clientes || !Array.isArray(clientes) || clientes.length === 0) {
@@ -494,7 +516,8 @@ app.post('/api/importar/upload', (req, res) => {
 });
 
 // Reimportar mantendo status de clientes já existentes
-app.post('/api/reimportar', (req, res) => {
+app.post('/api/reimportar', requireAuth, (req, res) => {
+  try {
   // Carrega clientes existentes com status
   const existentes = db.carregarClientes();
   const porTelefone = {};
@@ -524,6 +547,10 @@ app.post('/api/reimportar', (req, res) => {
   db.salvarClientes(novos);
   io.emit('contagem', db.contarPorStatus());
   res.json({ ...result, status_restaurados: Object.keys(porTelefone).length });
+  } catch (err) {
+    console.error('🔴 Erro:', err.message);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Exportar CSV
@@ -545,7 +572,7 @@ app.get('/api/exportar/csv', (req, res) => {
 });
 
 // Reiniciar do zero (limpa tudo)
-app.post('/api/reiniciar', (req, res) => {
+app.post('/api/reiniciar', requireAuth, (req, res) => {
   try {
     db.salvarClientes([]);
     db.limparLogEnvios();
@@ -555,6 +582,7 @@ app.post('/api/reiniciar', (req, res) => {
     io.emit('fila_atualizada', { na_fila: 0 });
     res.json({ sucesso: true, mensagem: 'Sistema resetado. Pronto para importar novo arquivo.' });
   } catch (err) {
+    console.error('🔴 Erro:', err.message);
     res.status(500).json({ error: err.message });
   }
 });

@@ -5,35 +5,36 @@ const EventEmitter = require('events');
 const fs = require('fs');
 const path = require('path');
 
-// Detecta Chrome/Chromium no Windows ou Linux (Railway, Nix, Docker)
+// Detecta Chrome/Chromium no Windows ou Linux (Railway/Nix)
 function detectarChrome() {
-  // Caminhos estáticos conhecidos
+  // 1. Variável de ambiente (pode ter sido setada no nixpacks)
+  if (process.env.PUPPETEER_EXECUTABLE_PATH && fs.existsSync(process.env.PUPPETEER_EXECUTABLE_PATH)) {
+    return process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
+
+  // 2. Caminhos estáticos conhecidos (Windows + Linux)
   const candidatos = [
-    'C:\Program Files\Google\Chrome\Application\chrome.exe',
-    'C:\Program Files (x86)\Google\Chrome\Application\chrome.exe',
+    'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
+    'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
     '/usr/bin/chromium',
     '/usr/bin/chromium-browser',
     '/usr/bin/google-chrome',
     '/usr/bin/google-chrome-stable',
-    '/snap/bin/chromium',
-    process.env.PUPPETEER_EXECUTABLE_PATH
-  ].filter(Boolean);
-
+    '/snap/bin/chromium'
+  ];
   for (const p of candidatos) {
     if (fs.existsSync(p)) return p;
   }
 
-  // Railway/Nix: procura via shell (chromium no Nix store)
+  // 3. Nix store (Railway): /nix/store/<hash>-chromium-<ver>/bin/chromium
   try {
     const { execSync } = require('child_process');
-    const found = execSync('which chromium chromium-browser google-chrome google-chrome-stable 2>/dev/null || true', { encoding: 'utf8', timeout: 3000 }).trim();
-    if (found && found.includes('/')) {
-      const first = found.split('\n')[0].trim();
-      if (first) return first;
-    }
-  } catch (e) {
-    // ignora erro do which
-  }
+    const found = execSync(
+      "find /nix/store -maxdepth 4 -type f -name chromium 2>/dev/null | head -1",
+      { encoding: 'utf8', timeout: 5000, shell: '/bin/sh' }
+    ).trim();
+    if (found) return found;
+  } catch (e) {}
 
   return null;
 }

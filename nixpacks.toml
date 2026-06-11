@@ -1,5 +1,5 @@
 [phases.setup]
-nixPkgs = ["chromium", "nss", "nspr", "atk", "at-spi2-atk", "libdrm", "libxkbcommon", "libxcomposite", "libxdamage", "libxrandr", "mesa", "egl-wayland", "libxshmfence", "cups"]
+nixPkgs = ["chromium", "glib", "nss", "nspr", "atk", "at-spi2-atk", "libdrm", "libxkbcommon", "libxcomposite", "libxdamage", "libxrandr", "mesa", "egl-wayland", "libxshmfence", "cups", "cairo", "pango", "gdk-pixbuf", "gtk3"]
 
 [phases.build]
 cmds = ["PUPPETEER_SKIP_DOWNLOAD=true npm install"]

@@ -5,6 +5,7 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
+    "postinstall": "rm -rf node_modules/puppeteer/.local-chromium node_modules/whatsapp-web.js/node_modules/puppeteer/.local-chromium 2>/dev/null; echo 'cleanup puppeteer cache done'",
     "import": "node src/importer.js"
   },
   "dependencies": {

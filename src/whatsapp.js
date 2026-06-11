@@ -30,11 +30,16 @@ function detectarChrome() {
   try {
     const { execSync } = require('child_process');
     const found = execSync(
-      "find /nix/store -maxdepth 4 -type f -name chromium 2>/dev/null | head -1",
-      { encoding: 'utf8', timeout: 5000, shell: '/bin/sh' }
+      "find /nix/store -maxdepth 5 -type f -name chromium 2>/dev/null | head -1",
+      { encoding: 'utf8', timeout: 8000, shell: '/bin/sh' }
     ).trim();
-    if (found) return found;
-  } catch (e) {}
+    if (found) {
+      console.log('  [boot] Chromium Nix detectado:', found);
+      return found;
+    }
+  } catch (e) {
+    console.log('  [boot] find Nix falhou:', e.message);
+  }
 
   return null;
 }
